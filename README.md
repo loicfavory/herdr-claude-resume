@@ -59,6 +59,8 @@ Herdr restaure les espaces, onglets et panneaux, mais pas encore les agents
 - Une session lancée hors d'un terminal Herdr n'est pas détectée comme « déjà ouverte ».
 - Un dossier de travail sur lequel Claude Code n'a pas encore été autorisé affiche la question de confiance
   habituelle.
+- Par sécurité, une session dont le dossier contient des guillemets, `$`, `` ` ``, `%`, `!`, `;`, `&`, `|`, `<`,
+  `>` (ou `\` hors Windows) n'est pas relancée : le chemin est inséré dans une commande shell.
 
 ## Licence
 

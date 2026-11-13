@@ -92,11 +92,23 @@ async function readSnapshot() {
   }
 }
 
+// Folders are pasted into a shell command: only resume when the path holds no character that
+// any supported shell treats as quoting or expansion (quotes of any kind, $, `, %, !, ;, &, |, <, >).
+// Backslashes are path separators only for Windows shells.
+const SAFE_PATH = /^[\p{L}\p{N} _.,@+=:~\/()\[\]{}#-]+$/u;
+const SAFE_WIN_PATH = /^[\p{L}\p{N} _.,@+=:~\/\\()\[\]{}#-]+$/u;
+
 function resumeCommand(shell, cwd, session) {
   if (!cwd) return `claude --resume ${session}`;
-  if (/^(pwsh|powershell)/i.test(shell)) return `Set-Location -LiteralPath '${String(cwd).replace(/'/g, "''")}'; claude --resume ${session}`;
-  if (/^cmd/i.test(shell)) return `cd /d "${cwd}" && claude --resume ${session}`;
-  return `cd '${String(cwd).replace(/'/g, "'\\''")}' && claude --resume ${session}`;
+  const path = String(cwd);
+  if (/^(pwsh|powershell|cmd)/i.test(shell)) {
+    if (!SAFE_WIN_PATH.test(path)) return null;
+    return /^cmd/i.test(shell)
+      ? `cd /d "${path}" && claude --resume ${session}`
+      : `Set-Location -LiteralPath '${path}'; claude --resume ${session}`;
+  }
+  if (!SAFE_PATH.test(path)) return null;
+  return `cd '${path}' && claude --resume ${session}`;
 }
 
 async function restore(cx) {
@@ -121,7 +133,12 @@ async function restore(cx) {
     const fg = await foreground(address);
     if (!fg || !SHELLS.test(fg.name ?? "")) continue;
     const shell = String(fg.name).replace(/^-/, "");
-    const r = await hc(["send", address, resumeCommand(shell, rec.cwd || fg.cwd, rec.session)]);
+    const cmd = resumeCommand(shell, rec.cwd || fg.cwd, rec.session);
+    if (!cmd) {
+      console.log(`claude-resume: ${address}: folder not resumed (unsafe characters)`);
+      continue;
+    }
+    const r = await hc(["send", address, cmd]);
     if (r.code === 0) {
       running.add(rec.session);
       resumed += 1;
