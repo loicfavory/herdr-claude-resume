@@ -26,6 +26,12 @@ Herdr restaure les espaces, onglets et panneaux, mais pas encore les agents
    git clone https://github.com/loicfavory/herdr-claude-resume ~/.config/herdr-app/mods/claude-resume
    ```
 
+   Sous PowerShell, `~` n'est pas développé pour les programmes externes comme `git` : utiliser `$HOME`.
+
+   ```powershell
+   git clone https://github.com/loicfavory/herdr-claude-resume $HOME\.config\herdr-app\mods\claude-resume
+   ```
+
    (Le nom du dossier doit être `claude-resume`.)
 
 2. Ajouter le mod au layout. Les layouts livrés avec Herdr (`main`, `terminals`, `win98`) sont réinstallés
@@ -35,7 +41,14 @@ Herdr restaure les espaces, onglets et panneaux, mais pas encore les agents
    herdr-app do layout.clone '{"name":"main","as":"mon-layout"}'
    ```
 
-   Dans `~/.config/herdr-app/layouts/mon-layout.json`, ajouter ce bloc invisible aux enfants d'un nœud
+   Sous Windows PowerShell 5.1, les guillemets doubles sont retirés de l'argument : les échapper.
+
+   ```powershell
+   herdr-app do layout.clone '{\"name\":\"main\",\"as\":\"mon-layout\"}'
+   ```
+
+   Dans `~/.config/herdr-app/layouts/mon-layout.json` (sous Windows :
+   `%USERPROFILE%\.config\herdr-app\layouts\mon-layout.json`), ajouter ce bloc invisible aux enfants d'un nœud
    toujours affiché (par exemple le nœud `work` du layout `main`) :
 
    ```json
@@ -44,12 +57,15 @@ Herdr restaure les espaces, onglets et panneaux, mais pas encore les agents
 
 3. Vérifier : `herdr-app check ~/.config/herdr-app/mods/claude-resume` puis `herdr-app status` (aucune
    erreur attendue). Après 30 secondes, `snapshot.json` liste les terminaux où tourne Claude.
+   Sous PowerShell : `herdr-app check $HOME\.config\herdr-app\mods\claude-resume`.
 
 ## Compatibilité
 
 - Testé sur Linux (Arch, Herdr 0.1.15, herdr-core 0.1.21), avec zsh.
 - macOS : devrait fonctionner tel quel (mêmes chemins, shells POSIX), non testé.
-- Windows : prévu (PowerShell, `cmd`, noms en `.exe`), non testé. Le chemin des sessions Claude Code y est
+- Windows avec terminaux WSL (adresses `wsl/…`) : testé. Le fichier de session est lu sur la machine du
+  terminal (`exec("cat", …, { on: "wsl" })`, dans le home Linux), avec repli sur le home local.
+- Windows natif : prévu (PowerShell, `cmd`, noms en `.exe`), non testé. Le chemin des sessions Claude Code y est
   `%USERPROFILE%\.claude\sessions`.
 
 ## Limites
