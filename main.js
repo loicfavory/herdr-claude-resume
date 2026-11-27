@@ -9,7 +9,7 @@
 // "content": { "mod": "claude-resume" } }.
 
 import { View, div } from "gpui-kit";
-import { hc, home, appHome, notify } from "herdr";
+import { hc, exec, home, appHome, notify } from "herdr";
 import * as fs from "fs/promises";
 
 const SNAPSHOT_MS = 30000;
@@ -44,10 +44,30 @@ async function foreground(address) {
   return d?.foreground ?? null;
 }
 
-async function sessionOfPid(pid) {
+// A terminal address such as "wsl/t6" names the machine it runs on (here WSL): its Claude
+// sessions live in that machine's home, not in the local one.
+function machineOf(address) {
+  const i = String(address).indexOf("/");
+  return i > 0 ? String(address).slice(0, i) : null;
+}
+
+async function readSessionFile(pid, address) {
+  const on = machineOf(address);
+  if (on) {
+    // exec runs in the machine's home by default. If that machine can't be reached this way,
+    // fall back to the local home.
+    try {
+      const r = await exec("cat", [`.claude/sessions/${pid}.json`], { on, timeout: 10000 });
+      if (r.code === 0) return r.stdout;
+    } catch {}
+  }
+  return await fs.readFile(`${home()}/.claude/sessions/${pid}.json`, "utf8");
+}
+
+async function sessionOfPid(pid, address) {
   if (!Number.isInteger(pid)) return null;
   try {
-    const d = JSON.parse(await fs.readFile(`${home()}/.claude/sessions/${pid}.json`, "utf8"));
+    const d = JSON.parse(await readSessionFile(pid, address));
     return ID.test(d.sessionId ?? "") ? { session: d.sessionId, cwd: d.cwd ?? null } : null;
   } catch {
     return null;
@@ -60,7 +80,7 @@ async function runningSessions() {
   for (const t of await liveTerminals()) {
     const fg = await foreground(t.address);
     if (!CLAUDE.test(fg?.name ?? "")) continue;
-    const s = await sessionOfPid(fg.pid);
+    const s = await sessionOfPid(fg.pid, t.address);
     if (s) ids.add(s.session);
   }
   return ids;
@@ -72,7 +92,7 @@ async function takeSnapshot() {
   for (const t of await liveTerminals()) {
     const fg = await foreground(t.address);
     if (!CLAUDE.test(fg?.name ?? "")) continue;
-    const s = await sessionOfPid(fg.pid);
+    const s = await sessionOfPid(fg.pid, t.address);
     if (!s || seen.has(s.session)) continue;
     seen.add(s.session);
     terminals[t.address] = { session: s.session, cwd: s.cwd ?? fg.cwd ?? null };
